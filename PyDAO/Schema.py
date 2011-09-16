@@ -11,6 +11,7 @@
 
 from collections import defaultdict
 from PyDAOException import *
+from IndentWriter import *
 
 #--------------------------------------------------------------------
 class SchemaException (PyDAOException): pass
@@ -104,18 +105,18 @@ class DatabaseSchema (object):
 
    
    def __repr__ (self):
-      s = '<database name="%s">\n' % self.getName ()
-      tableReprs = []
+      sb = IndentStringBuilder ()
 
-      for table in self.getAllTables ():
-         tableReprs.append (str (table))
+      sb.println ('<database name="%s">' % self.getName ())
+      
+      with sb:
+         for table in self.getAllTables ():
+            sb.printLines (str (table))
+            sb.newline ()
 
-      for reprStr in tableReprs:
-         for line in reprStr.splitlines (True):
-            s += '\t' + line
+      sb.println ('</database>')
 
-      s += '</database>'
-      return s
+      return str (sb)
 
 
 #--------------------------------------------------------------------
@@ -272,24 +273,23 @@ class TableSchema (object):
 
 
    def __repr__ (self):
-      s = '<table name="%s">\n' % self.getName ()
-      childReprs = []
+      sb = IndentStringBuilder ()
       
-      for column in self.getAllColumns ():
-         childReprs.append (str (column))
+      sb.println ('<table name="%s">' % self.getName ())
       
-      childReprs.append ('\n')
+      with sb:
+         for column in self.getAllColumns ():
+            sb.printLines (str (column))
+      
+      sb.newline ()
+   
+      with sb:
+         for index in self.getAllIndexes ():
+            sb.printLines (str (index))
 
-      for index in self.getAllIndexes ():
-         childReprs.append (str (index)) 
-
-      for reprStr in childReprs:
-         for line in reprStr.splitlines (True):
-            s += '\t' + line
-
-      s += '</table>\n'
-      return s
-
+      sb.println ('</table>')
+      
+      return str (sb)
 
 #--------------------------------------------------------------------
 class ColumnSchema (object):
@@ -373,8 +373,9 @@ class IndexSchema (object):
          Initializes an Index.
       """
 
-      self.name = indexName;
-      self.isUniqueVal = not isUnique;
+      self.name = indexName
+      self.isUniqueVal = not isUnique
+      self.constraint = None
 
       self.columns = []
 
@@ -393,6 +394,23 @@ class IndexSchema (object):
       """
 
       return self.columns
+
+
+   def getConstraint (self):
+      """
+         Fetch the constraint on this index, or None
+         if there is no constraint.
+      """
+
+      return self.constraint
+
+
+   def setConstraint (self, constraint):
+      """
+         Set the constraint on this index.
+      """
+
+      self.constraint = constraint
 
 
    def getName (self):
@@ -414,14 +432,133 @@ class IndexSchema (object):
 
 
    def __repr__ (self):
-      s = '<index name="%s" unique="%s">\n' % (
-            self.getName (),
-            str (self.isUnique ()))
+      sb = IndentStringBuilder ()
       
-      for column in self.getColumns ():
-         s += '\t<column>%s</column>\n' % column
+      sb.println ('<index name="%s" unique="%s">' % (
+            self.getName (),
+            str (self.isUnique ())))
+      
+      with sb:
+         for column in self.getColumns ():
+            sb.println ('<column name="%s"/>' % column)
+   
+      sb.println ('</index>')
 
-      s += '</index>\n'
+      return str (sb)
 
-      return s
+
+#--------------------------------------------------------------------
+class Constraint (object):
+   """
+      An abstract class for constraints.
+
+      In PyDAO, constraints are properties of indexes which allow the 
+      DAO generators to understand the nature of the index.
+
+      Constraints allow the DAO generators to make informed decisions
+      regarding what type and how many parameters to return from
+      generated methods, and what sorts of exceptions to expect.
+   """
+   
+   def __init__ (self, constraintType):
+      """
+         Initializes an abstract Constraint.
+      """
+
+      self.constraintType = constraintType
+      self.columns = []
+   
+   
+   def addColumn (self, columnName):
+      """
+         Adds the named column to the constraint.
+      """
+
+      self.columns.append (columnName)
+
+
+   def getColumns (self):
+      """
+         Gets a list of all column names in this constraint.
+      """
+      
+      return self.columns
+
+
+   def getType ():
+      """
+         Gets the type of the constraint.
+      """
+      return self.constraintType
+
+
+#--------------------------------------------------------------------
+class UniqueConstraint (Constraint):
+   """
+      An object representing a unique key constraint.
+   """
+
+   def __init__ (self):
+      """
+         Initializes a UniqueConstraint.
+      """
+
+      Constraint.__init__ (self, "UNIQUE")
+
+
+#--------------------------------------------------------------------
+class PrimaryKeyConstraint (Constraint):
+   """
+      An object representing a primary key constraint.
+   """
+
+   def __init__ (self):
+      """
+         Initializes a PrimaryKeyConstraint.
+      """
+
+      Constraint.__init__ (self, "PRIMARY_KEY")
+
+
+#--------------------------------------------------------------------
+class ForeignKeyConstraint (Constraint):
+   """
+      A object representing a foreign key constraint.
+
+      Supports multi-column foreign keys and foreign keys
+      into tables in different databases.
+   """
+
+   def __init__ (self, tableName, databaseName = None):
+      """
+         Initializes a ForeignKeyConstraint.
+      """
+
+      Constraint.__init__ (self, "FOREIGN_KEY")
+      
+      self.columnMap = {}
+      self.tableName = tableName
+      self.databaseName = databaseName
+
+
+   def mapColumn (self, column, foreignColumn):
+      """
+         Maps the given local column to the given foreign column.
+      """
+
+      self.columnMap [column] = foreignColumn
+
+
+   def getMapping (self, column):
+      """
+         Gets the foreign mapping for the given column,
+         or None if no mapping exists.
+      """
+   
+      if self.columnMap.has_key (column):
+         return self.columnMap [column]
+
+      else:
+         return None
+
 

@@ -13,13 +13,14 @@
 #
 
 from SchematizerException import *
+from Schematizer import *
 from Schema import *
 
 #--------------------------------------------------------------------
 class MySQLSchematizerException (SchematizerException): pass
 
 #--------------------------------------------------------------------
-class MySQLSchematizer (object):
+class MySQLSchematizer (Schematizer):
    """
       Expresses a MySQL database as an abstract DatabaseSchema.
 
@@ -243,4 +244,36 @@ class MySQLSchematizer (object):
          indexes.append (index)
 
       return indexes
+
+   
+   def getIndexConstraint (self, tableName, indexName):
+      """
+         Fetch the constraint associated with the given index,
+         if there is one.
+      """
+
+      constraint = None
+
+      cursor = self.getConnection ().cursor ()
+
+      cursor.execute ("""
+         select constraint_type
+            from information_schema.table_constraints
+
+         where 
+            table_schema = %s and
+            table_name = %s and
+            constraint_name = %s
+      """, (self.getDatabaseName (), tableName))
+
+      result = cursor.fetchone ()
+
+      if result is not None:
+         constraintType = result [0]
+
+      else:
+         # There is no constraint associated with this index.
+         return None
+
+      
 
