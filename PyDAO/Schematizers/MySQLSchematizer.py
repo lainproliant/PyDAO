@@ -12,15 +12,15 @@
 # Released under the GNU General Public License, version 3.
 #
 
-from SchematizerException import *
-from Schematizer import *
-from Schema import *
+from PyDAO.SchematizerException import *
+from PyDAO.SchematizerBase import *
+from PyDAO.Schema import *
 
 #--------------------------------------------------------------------
 class MySQLSchematizerException (SchematizerException): pass
 
 #--------------------------------------------------------------------
-class MySQLSchematizer (Schematizer):
+class MySQLSchematizer (SchematizerBase):
    """
       Expresses a MySQL database as an abstract DatabaseSchema.
 

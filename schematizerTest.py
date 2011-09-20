@@ -1,4 +1,4 @@
-from PyDAO.MySQLSchematizer import *
+from PyDAO.Schematizers import MySQLSchematizer
 from getpass import getpass
 import MySQLdb
 import sys

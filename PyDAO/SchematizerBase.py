@@ -1,5 +1,5 @@
 #
-# Schematizer
+# SchematizerBase
 #
 # An abstract base class for schematizers.
 #
@@ -9,7 +9,7 @@
 
 from abc import ABCMeta, abstractmethod
 
-class Schematizer (object):
+class SchematizerBase (object):
    """
       Abstract base class for Schematizers.
 
