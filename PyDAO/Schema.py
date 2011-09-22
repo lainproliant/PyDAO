@@ -9,7 +9,6 @@
 # Released under the GNU General Public License, version 3.
 #
 
-from collections import defaultdict
 from PyDAOException import *
 from IndentWriter import *
 
