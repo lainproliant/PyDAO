@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
+<!-- This is an example mapping file for PyDAO. -->
 <mapping>
-   <database name="Sugoicon">
-      <schematizer name="PyDAO.Schematizers.MySQLSchematizer"/>
-      <generator name="PyDAO.Generators.PHP.MySQLiGenerator"/>
-   
+   <database type="MySQL" name="Sugoicon" host="localhost" port="3306">
+      <generator language="PHP" output="php/DAO"/>
+      <generator language="Java" output="java/DAO"/>
+      <generator langauge="Python" output="python/DAO"/>
+
       <alltables/>
-      <table name="Users" as="Logins"/>
    </database>
 </mapping>
 

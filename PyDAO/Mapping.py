@@ -86,12 +86,21 @@ class MappingParser (xml.sax.ContentHandler):
          Initializes a Mapping controller object.
       """
 
+      self._databaseCycleInit ()
+
+   
+   def _databaseCycleInit (self):
+      """
+         Re-initializes variables used to process each database element.
+      """
+      
       self.schematizer = None
       self.generator = None
       self.schema = None
       self.generateAllTables = False
       self.databaseAlias = None
-
+      self.outputPath = '.'
+      
       self.tableMapping = {}
 
       self.stack = []
@@ -203,8 +212,12 @@ class MappingParser (xml.sax.ContentHandler):
          className = attrs ['name']
 
       else:
-         raise MappingException, "Missing required attribute 'name'.
+         raise MappingException, "Missing required attribute 'name'."
 
+
+      cl = ClassLoader ()
+      
+      self.schematizerClass = cl.loadClass (className)
 
 
    def startDatabase (name, attrs):
@@ -216,6 +229,24 @@ class MappingParser (xml.sax.ContentHandler):
          When the <database/> element ends, code will be generated.
       """
       
+      self._databaseCycleInit ()
+
       if attrs.has_key ('as'):
          self.databaseAlias = attrs ['as']
+
+      if attrs.has_key ('output')
+         self.outputPath = attrs ['output']
+
+
+   def endDatabase (name):
+      """
+         Called upon the closing of a <database/> element.
+         
+         This is the step at which code generation occurs.
+         This method will throw an ImportError if the given
+         schematizer or generator classes cannot be loaded.
+      """
+
+      # LRS-TODO: Implement this method.
+      pass
 
