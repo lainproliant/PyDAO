@@ -10,6 +10,7 @@
 #
 
 from PyDAOException import *
+from Mapping import NamedObject
 from IndentWriter import *
 
 #--------------------------------------------------------------------
@@ -20,7 +21,7 @@ class ColumnSchemaException (SchemaException): pass
 class IndexSchemaException (SchemaException): pass
 
 #--------------------------------------------------------------------
-class DatabaseSchema (object):
+class DatabaseSchema (NamedObject):
    """
       Abstract representation of a relational database schema.
    """
@@ -29,21 +30,14 @@ class DatabaseSchema (object):
       """
          Initializes a DatabaseSchema.
       """
+      
+      NamedObject.__init__ (self, databaseName)
 
-      self.name = databaseName
       self.tables = []
 
       self.tableMap = {}
 
    
-   def getName (self):
-      """
-         Gets the name of this database.
-      """
-
-      return self.name
-
-
    def addTable (self, table):
       """
          Adds the given table to the database.
@@ -119,7 +113,7 @@ class DatabaseSchema (object):
 
 
 #--------------------------------------------------------------------
-class TableSchema (object):
+class TableSchema (NamedObject):
    """
       An abstract representation of a table in a database.
    """
@@ -129,8 +123,7 @@ class TableSchema (object):
          Initializes a TableSchema.
       """
    
-      # The name of the table.
-      self.tableName = tableName
+      NamedObject.__init__ (self, tableName)
 
       # A sequential list of the columns in the table.
       self.columns = []
@@ -150,14 +143,6 @@ class TableSchema (object):
       self.indexMap = {}
 
    
-   def getName (self):
-      """
-         Returns the name of this table.
-      """
-
-      return self.tableName
-
-
    def addColumn (self, column):
       """
          Adds the given column to the table.
@@ -290,8 +275,9 @@ class TableSchema (object):
       
       return str (sb)
 
+
 #--------------------------------------------------------------------
-class ColumnSchema (object):
+class ColumnSchema (NamedObject):
    """
       An abstract representation of a column in a database table.
    """
@@ -301,7 +287,8 @@ class ColumnSchema (object):
          Initializes a ColumnSchema.
       """
 
-      self.name = name
+      NamedObject.__init__ (self, name)
+
       self.datatype = datatype
    
       if isNullable == 'YES':
@@ -316,14 +303,6 @@ class ColumnSchema (object):
       self.extra = extra
 
    
-   def getName (self):
-      """
-         Gets the name of this column.
-      """
-
-      return self.name
-
-
    def getDataType (self):
       """
          Gets the data type of this column.
@@ -358,7 +337,7 @@ class ColumnSchema (object):
 
 
 #--------------------------------------------------------------------
-class IndexSchema (object):
+class IndexSchema (NamedObject):
    """
       An abstract representation of a named index on a table,
       composed of columns within the table.

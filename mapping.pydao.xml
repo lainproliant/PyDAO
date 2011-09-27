@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<mapping>
+   <database name="Sugoicon">
+      <schematizer name="PyDAO.Schematizers.MySQLSchematizer"/>
+      <generator name="PyDAO.Generators.PHP.MySQLiGenerator"/>
+   
+      <alltables/>
+      <table name="Users" as="Logins"/>
+   </database>
+</mapping>
+

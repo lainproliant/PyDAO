@@ -3,10 +3,10 @@ from getpass import getpass
 import MySQLdb
 import sys
 
-
-def getSchematizer ():
+def getSchema ():
    sys.stderr.write ("Username: ")
    username = raw_input ()
+   tables = []
 
    password = getpass ("Password: ", sys.stderr)
 
@@ -19,10 +19,15 @@ def getSchematizer ():
    sys.stderr.write ("Database: ")
    databaseName = raw_input ()
 
-   schematizer = MySQLSchematizer (db, databaseName)
+   sys.stderr.write ("Tables (a,b,c/ALL) [ALL]: ")
+   tableInput = raw_input ()
 
-   return schematizer
+   if tableInput and tableInput != 'ALL':
+      tables = tableInput.split (',')
+
+   schematizer = MySQLSchematizer (db, databaseName)
+   return schematizer.schematize (tables)
 
 if __name__ == "__main__":
-   print str (getSchematizer ().schematize ())
+   print str (getSchema ())
 

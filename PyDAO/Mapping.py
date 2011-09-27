@@ -11,14 +11,66 @@
 # Released under the GNU General Public License, version 3.
 #
 
+from abc import ABCMeta
 from collections import namedtuple
 from PyDAOException import *
+from ClassLoader import *
+
+import xml.sax
 
 #--------------------------------------------------------------------
 class MappingException (PyDAOException): pass
 
 #--------------------------------------------------------------------
-class Mapping (object):
+class NamedObject (object):
+   """
+      An object with a named representation that can be mapped
+      to another name.
+   """
+
+   __metaclass__ = ABCMeta
+   
+   def __init__ (self, name, mappedName = None):
+      """
+         Initializes a mapped object.
+      """
+
+      self.name = name
+      self.mappedName = mappedName
+
+
+   def getName (self):
+      """
+         Gets the name of the object.
+      """
+
+      return self.name
+
+   
+   def getMappedName (self):
+      """
+         Gets the mapped name of the object, or simply
+         the name if there is no mapping.
+      """
+
+      if self.mappedName is not None:
+         return self.mappedName
+
+      else:
+         return self.getName ()
+
+
+   def setMappedName (self, mappedName):
+      """
+         Sets the mapped name.
+         Provide None to disable the mapped name.
+      """
+
+      self.mappedName = mappedName
+
+
+#--------------------------------------------------------------------
+class MappingParser (xml.sax.ContentHandler):
    """
       An object which controls the DAO code generation process.
 
@@ -29,27 +81,141 @@ class Mapping (object):
       mapping definition file (*.pydao.xml).
    """
 
-   DatabaseMapping = namedtuple ("DatabaseMapping",
-         ["mappedName", "tableMappings"])
-   TableMapping = namedtuple ("TableMapping",
-         ["mappedName", "columnMappings", "indexMappings"])
-   TableMapping = namedtuple ("ColumnMapping",
-         ["mappedName"])
-   IndexMapping = namedtuple ("IndexMapping",
-         ["mappedName"])
-
-
    def __init__ (self):
       """
          Initializes a Mapping controller object.
       """
 
-      self.schematizerName = None
-      self.generatorName = None
-      self.databaseName = None
-      
-      # A list of DatabaseMapping tuples.
-      self.nameMapping = {}
+      self.schematizer = None
+      self.generator = None
+      self.schema = None
+      self.generateAllTables = False
+      self.databaseAlias = None
 
+      self.tableMapping = {}
+
+      self.stack = []
+
+
+   def getSchematizer (self):
+      """
+         Fetches the schematizer object.
+         This object does not exist until a <schematizer/>
+         element is parsed.
+      """
+
+      return self.schematizer
    
+
+   def getGenerator (self):
+      """
+         Fetches the generator object.
+      """
+
+      return self.generator
+
+
+   def getSchema (self):
+      """
+         Fetches the current database schema.
+      """
+
+      return self.schema
+
+
+   def startDocument (self):
+      """
+         SAX Event Handler: Start of Document.
+      """
+
+      # Nothing to do for now.
+      pass
+
+
+   def endDocument (self):
+      """
+         SAX Event Handler: End of Document.
+      """
+
+      # Nothing to do for now.
+      pass
+
+
+   def startElement (self, name, attrs):
+      """
+         SAX Event Handler: Start of Element.
+      """
+      
+      lname = name.lower ()
+      stack.push (lname)
+
+      if not stack:
+         if name.lower () == 'mapping':
+            self.startMapping (name, attrs) 
+
+         else:
+            raise MappingException, "Invalid document element, must be 'mapping'."
+
+      if lname == 'database':
+         self.startDatabase (name, attrs)
+
+      elif lname == 'schematizer':
+         self.startSchematizer (name, attrs)
+
+      elif lname == 'generator':
+         self.startGenerator (name, attrs)
+
+      elif lname == 'alltables':
+         self.startAlltables (name, attrs)
+
+      elif lname == 'table':
+         self.startTable (name, attrs)
+
+      else:
+         raise MappingException, "Unrecognized document element: '%s'." % name
+
+
+   def endElement (self, name):
+      """
+         SAX Event Handler: End of Element.
+      """
+      
+      if name.lower () == 'database':
+         self.endDatabase (name)
+
+
+   def startMapping (name, attrs):
+      """
+         Called upon a <mapping/> element. 
+      """
+      
+      # Nothing to do for now.
+      pass
+
+
+   def startSchematizer (name, attrs):
+      """
+         Called upon a <schematizer/> element.
+         Must be contained within <database/>
+      """
+      
+      if attrs.has_key ('name'):
+         className = attrs ['name']
+
+      else:
+         raise MappingException, "Missing required attribute 'name'.
+
+
+
+   def startDatabase (name, attrs):
+      """
+         Called upon a <database/> element.
+         Must be contained within <mapping/>
+
+         Generates a DatabaseSchema object for the database.
+         When the <database/> element ends, code will be generated.
+      """
+      
+      if attrs.has_key ('as'):
+         self.databaseAlias = attrs ['as']
 

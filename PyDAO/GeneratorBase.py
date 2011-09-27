@@ -19,7 +19,7 @@ class GeneratorBase (object):
       language and database access system.
 
       Generators also accept a Mapping object, which is used
-      to customize the code generation process.
+      to control the code generation process.
    """
    
    __metaclass__ = ABCMeta

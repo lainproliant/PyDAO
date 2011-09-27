@@ -59,7 +59,7 @@ class MySQLSchematizer (SchematizerBase):
       self.closeConnection ()
 
    
-   def schematize (self):
+   def schematize (self, tables = []):
       """
          Collects all possible information about the
          database, its tables, their columns and indexes
@@ -67,8 +67,12 @@ class MySQLSchematizer (SchematizerBase):
       """
 
       schema = DatabaseSchema (self.getDatabaseName ())
+      
+      if not tables:
+         tableNames = self.getTableNames ()
 
-      tableNames = self.getTableNames ()
+      else:
+         tableNames = tables
 
       for tableName in tableNames:
          schema.addTable (self.schematizeTable (tableName))
@@ -276,4 +280,3 @@ class MySQLSchematizer (SchematizerBase):
          return None
 
       
-
