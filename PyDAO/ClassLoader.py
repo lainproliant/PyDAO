@@ -13,6 +13,8 @@
 # Released under the GNU General Public License, version 3.
 #
 
+import inspect
+
 #--------------------------------------------------------------------
 class ClassLoaderException (Exception): pass
 
@@ -36,8 +38,8 @@ class ClassLoader (object):
          Loads and returns the given module.
       """
 
-      module = __import__ (name)
-      path = name.split ('.')
+      module = __import__ (moduleName)
+      path = moduleName.split ('.')
       for component in path [1:]:
          try:
             module = getattr (module, component)
@@ -47,28 +49,42 @@ class ClassLoader (object):
 
       return module
 
-
-   def loadClass (self, className):
+   
+   def loadFromModule (self, objectName):
       """
-         Loads and returns the given class
-         within the given module.
+         Loads an arbitrary object from the given module
       """
 
-      path = name.split ('.')
+      path = objectName.split ('.')
 
       if len (path) < 2:
-         raise ClassLoaderException, "Invalid module/class path: %s" % className
+         raise ClassLoaderException, "Invalid object path: %s" % objectName
 
-      modulePath = path [:-1]
-      className = path [-1]
+      modulePath = '.'.join (path [:-1])
+      objectBaseName = path [-1]
 
       module = self.loadModule (modulePath)
 
       try:
-         classObj = getattr (module, className)
+         obj = getattr (module, objectBaseName)
 
       except AttributeError, excVal:
          raise ClassLoaderException, excVal
 
-      return classObj
+      return obj
+
+
+   def loadClass (self, className):
+      """
+         Loads and returns the given object.
+         This method will throw a ClassLoaderException if the object
+         is not a class.
+      """
+
+      obj = self.loadFromModule (className)
+
+      if not inspect.isclass (obj):
+         raise ClassLoaderException, 'Object "%s" is not a class.' % obj
+
+      return obj
 
