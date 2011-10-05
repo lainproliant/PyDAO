@@ -100,14 +100,14 @@ class DatabaseSchema (NamedObject):
    def __repr__ (self):
       sb = IndentStringBuilder ()
 
-      sb.println ('<database name="%s">' % self.getName ())
+      sb ('<database name="%s">' % self.getName ())
       
       with sb:
          for table in self.getAllTables ():
             sb.printLines (str (table))
             sb.newline ()
 
-      sb.println ('</database>')
+      sb ('</database>')
 
       return str (sb)
 
@@ -259,7 +259,7 @@ class TableSchema (NamedObject):
    def __repr__ (self):
       sb = IndentStringBuilder ()
       
-      sb.println ('<table name="%s">' % self.getName ())
+      sb ('<table name="%s">' % self.getName ())
       
       with sb:
          for column in self.getAllColumns ():
@@ -271,7 +271,7 @@ class TableSchema (NamedObject):
          for index in self.getAllIndexes ():
             sb.printLines (str (index))
 
-      sb.println ('</table>')
+      sb ('</table>')
       
       return str (sb)
 
@@ -412,15 +412,15 @@ class IndexSchema (NamedObject):
    def __repr__ (self):
       sb = IndentStringBuilder ()
       
-      sb.println ('<index name="%s" unique="%s">' % (
+      sb ('<index name="%s" unique="%s">' % (
             self.getName (),
             str (self.isUnique ())))
       
       with sb:
          for column in self.getColumns ():
-            sb.println ('<column name="%s"/>' % column)
+            sb ('<column name="%s"/>' % column)
    
-      sb.println ('</index>')
+      sb ('</index>')
 
       return str (sb)
 

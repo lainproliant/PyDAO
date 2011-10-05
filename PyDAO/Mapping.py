@@ -23,88 +23,10 @@ import Schematizers
 import Generators
 
 import xml.dom.minidom
+import re
 
-#--------------------------------------------------------------------
-# Default Mapping of Database Types to Schematizer class names.
-# Schematizers can be added or replaced at runtime by calling
-# PyDAO.Mapping.registerSchematizer ().
-
-SchematizerMapping = {
-      'MySQL':   PyDAO.Schematizer.MySQLSchematizer }
-
-
-#--------------------------------------------------------------------
-# Default Mapping of Languages to Generator class names.
-# Generators can be added or replaced at runtime by calling
-# PyDAO.Mapping.registerGenerator ().
-
-GeneratorMapping = {
-      'PHP':      PyDAO.Generators.PHP.MySQLiGenerator
-      'xml':      PyDAO.Generators.SchemaGenerator
-      }
-
-
-#--------------------------------------------------------------------
-class MappingException (PyDAOException): pass
-
-
-#--------------------------------------------------------------------
-def registerSchematizer (databaseType, className):
-   """
-      Registers a fully qualified class name with the given
-      database type.
-
-      Use this on module or class import to dynamically add new
-      schematizers which can be used in mapping.
-
-      databaseType: Should be specified as the type of database
-         for which schematizer support is to be added, e.g.:
-         Oracle, MSSQL, PostgreSQL, SQLite, etc.
-
-      className: Should be specified as a fully qualified class name,
-         e.g.:
-         LeeDAO.Schematizers.PostgreSQLSchematizer,
-         LeeDAO.Schematizers.MSSQLSchematizer, etc.
-   """
-
-   SchematizerMapping [databaseType] = className
-
-
-#--------------------------------------------------------------------
-def registerGenerator (language, className):
-   """
-      Registers a fully qualified class name with the given
-      programming language or language/toolkit pair.
-
-      Use this on module or class import to dynamically add new
-      generators which can be used in code generation.
-
-      language: Should be specified as the name of the language
-         or language/toolkit pair for which generation is supported,
-         e.g.:
-         Perl, Perl/DBI, C++, Python/MySQLdb, C#, etc.
-
-      className: Should be specified as a fully qualified class name,
-         e.g.:
-         LeeDAO.Generators.CXX.Connector,
-         LeeDAO.Generators.Java.JDBC,
-         LeeDAO.Generators.Python.MySQLdb, etc.
-   """
-
-   GeneratorMapping [language] = className
-
-
-#--------------------------------------------------------------------
-def registerConnectionFactory (databaseType, className):
-   """
-      Registers a fully qualified class name with the given
-      database type.
-
-      Use this on module or class import to dynamically add
-      new connection factories.
-   """
-   
-   ConnectionFactoryMapping [databaseType] = className
+# A regular expression pattern matching valid table and alias names.
+RE_VALID_NAME = "[A-Za-z_][A-Za-z0-9_]*"
 
 
 #--------------------------------------------------------------------
@@ -138,13 +60,13 @@ class NamedObject (object):
 
    __metaclass__ = ABCMeta
    
-   def __init__ (self, name, mappedName = None):
+   def __init__ (self, name, alias = None):
       """
          Initializes a mapped object.
       """
 
       self.name = name
-      self.mappedName = mappedName
+      self.alias = alias
 
 
    def getName (self):
@@ -155,32 +77,35 @@ class NamedObject (object):
       return self.name
 
    
-   def getMappedName (self):
+   def getAlias (self):
       """
          Gets the mapped name of the object, or simply
          the name if there is no mapping.
       """
 
-      if self.mappedName is not None:
-         return self.mappedName
+      if self.alias is not None:
+         return self.alias
 
       else:
          return self.getName ()
 
 
-   def setMappedName (self, mappedName):
+   def setAlias (self, alias):
       """
          Sets the mapped name.
          Provide None to disable the mapped name.
       """
 
-      self.mappedName = mappedName
+      self.alias = alias
 
 
 #--------------------------------------------------------------------
 class TableMappingJob (object):
    """
       Keeps track of the mappings for tables, columns, and indexes.
+
+      Attempts to apply this mapping to the DatabaseSchema before
+      code generation occurs.
    """
    
    def __init__ (self, databaseJob = None):
@@ -190,9 +115,12 @@ class TableMappingJob (object):
 
       self.databaseJob = databaseJob
       self.name = None
-      self.mappedName = None
+      self.alias = None
       self.columnMapping = OrderedDict ()
       self.indexMapping = OrderedDict ()
+      self.allColumns = True
+      self.allColumnsExplicit = False
+      self.allIndexes = False
 
 
    @staticmethod
@@ -204,14 +132,147 @@ class TableMappingJob (object):
       tableJob = TableMappingJob (databaseJob)
       
       if tableElement.hasAttribute ('name'):
+         name = tableElement.getAttribute ('name')
+         
+         if not re.match (RE_VALID_NAME, name):
+            raise MappingException, "Invalid name: '%s'." % name
+
+         tableJob.name = name
       
+      else:
+         raise MappingException, "Missing required attribute 'name' in 'table'."
 
+      if tableElement.hasAttribute ('as'):
+         alias = tableElement.getAttribute ('as')
 
+         if not re.match (RE_VALID_NAME, alias):
+            raise MappingException, "Invalid alias: '%s'." % alias
 
+         tableJob.alias = alias
 
+      childElements = [e for e in tableElement.childNodes if \
+            e.nodeType == Node.ELEMENT_NODE]
 
-        
+      for element in childElements:
+         if element.tagName == 'index':      # Interpret index mappings.
+
+            if not element.hasAttribute ('name'):
+               raise MappingException, "Missing required attribute 'name' in 'index'."
+
+            indexName = element.getAttribute ('name')
+            indexAlias = None
+
+            if not re.match (RE_VALID_NAME, indexName):
+               raise MappingException, "Invalid name: '%s'." % indexName
+
+            if element.hasAttribute ('as'):
+               indexAlias = element.getAttribute ('as')
+
+            if not re.match (RE_VALID_NAME, indexAlias):
+               raise MappingException, "Invalid alias: '%s'." % indexAlias
+
+            tableJob.mapIndex (indexName, indexAlias)
+         
+         if element.tagName == 'column':     # Interpret column mappings.
+
+            if not element.hasAttribute ('name'):
+               raise MappingException, "Missing required attribute 'name' in 'column'."
+
+            columnName = element.getAttribute ('name')
+            columnAlias = None
+
+            if not re.match (RE_VALID_NAME, columnName):
+               raise MappingException, "Invalid name: '%s'." % columnName
+
+            if element.hasAttribute ('as'):
+               columnAlias = element.getAttribute ('as')
+
+            if not re.match (RE_VALID_NAME, columnAlias):
+               raise MappingException, "Invalid alias: '%s'." % columnAlias
+
+            tableJob.mapColumn (columnName, columnAlias)
+
+         if element.tagName == 'allcolumns':  # Interpret allcolumns mapping.
+            tableJob.mapAllColumns ()
+
+         if element.tagName == 'allindexes':  # Interpret allindexes mapping.
+            tableJob.mapAllIndexes ()
+
    
+   def mapColumn (self, columnName, columnAlias = None):
+      """
+         Adds a column to include in the mapping, and optionally
+         its alias.
+
+         By default, if no columns are included in the mapping
+         explicitly, all columns will be included.  If any
+         columns are specified, only those columns will be
+         included.  To override this behavior, specify
+         <allcolumns/> in the table mapping XML or call
+         mapAllColumns ().
+      """
+      
+      if not self.columnMapping and not self.allColumnsExplicit:
+         self.allColumns = False
+
+      self.columnMapping [columnName] = columnAlias
+
+
+   def mapIndex (self, indexName, indexAlias = None):
+      """
+         Adds an index to include in the mapping, and optionally
+         its alias.
+
+         By default, no indexes are included in the mapping.
+         Only the specified indexes are included, unless
+         <allindexes/> is specifed in the table mapping XML
+         or mapAllIndexes () is called, in which case all indexes
+         are included.
+      """
+      
+      self.indexMapping [indexName] = indexAlias
+
+
+   def mapAllColumns (self):
+      """
+         Specifies that all columns in the table schema
+         should be mapped in code generation.
+
+         Additional mappings may be specified to provide
+         column aliases.
+      """
+
+      self.allColumns = True
+      self.allColumnsExplicit = True
+
+
+   def applyMapping (self, schema):
+      """
+         Apply this table mapping to the given database schema.
+
+         Sets the aliases for this table and each of the table's
+         columns and indexes.  Also validates that the contents
+         of the mapping exist in the schema.
+      """
+      
+      tableSchema = schema.getTable (self.name)
+
+      if tableSchema is None:
+         raise MappingException, "The given database '%s' does not contain a table named '%s'." % (schema.getName (), self.name)
+
+      if self.alias is not None:
+         tableSchema.setAlias (self.alias)
+
+      for columnName in self.columnMapping:
+         columnSchema = tableSchema.getColumn (columnName)
+         columnAlias = self.columnMapping [columnName]
+
+         if columnSchema is None:
+            raise MappingException, "The given table '%s.%s' does not contain a column named '%s'." % (schema.getName (), tableSchema.getName (), columnName)
+
+         if columnAlias is not None:
+            columnSchema.setAlias (columnAlias)
+          
 
 #--------------------------------------------------------------------
 class DatabaseJob (object):
@@ -229,9 +290,10 @@ class DatabaseJob (object):
       self.generator = None
       self.schema = None
 
-      self.tableMappings = OrderedDict ()
+      self.tableMapping = OrderedDict ()
 
       self.allTables = False
+      self.allTablesExplicit = False
 
 
    @staticmethod
@@ -254,14 +316,45 @@ class DatabaseJob (object):
             databaseJob.interpretGenerator (element)
          
          elif element.tagName == 'alltables':
-            databaseJob.allTables = True
+            databaseJob.mapAllTables ()
 
          elif element.tagName == 'table':
+            databaseJob.interpretTable (element)
 
-         
 
-         
+   def interpretTable (self, tableElement):
+      """
+         Interprets a table element.  Passes the element
+         into TableMappingJob.fromXML () and adds to table
+         mappings.
+      """
       
+      tableJob = TableMappingJob.fromXML (tableElement, self)
+      self.mapTable (tableJob)
+   
+
+   def mapTable (self, tableJob):
+      """
+         Adds the given table mapping job to this job.
+      """
+
+      if not self.tableMapping and not self.allTablesExplicit:
+         self.allTables = False
+
+      self.tableMapping [tableJob.name] = tableJob
+
+
+   def mapAllTables (self):
+      """
+         Specifies that all tables in the database schema
+         should be mapped in code generation
+
+         Additional mappings may be specified to provide
+         table, column, and index aliases.
+      """
+
+      self.allTables = True
+      self.allTablesExplicit = True
 
 
 #--------------------------------------------------------------------
@@ -276,6 +369,7 @@ class MappingJob (object):
       """
       
       self.document = None
+      self.databaseJobs = []
   
 
    @staticmethod
@@ -302,11 +396,13 @@ class MappingJob (object):
 
          else:
             raise MappingException, "Unrecognized element: '%s'" % element.tagName
-   
+
+      return mappingJob
+
 
    def interpretImport (self, element):
       """
-         Interprets an import tag, importing the given python class.
+         Interprets an import element, importing the given python class.
       """
          
       className = None
@@ -315,7 +411,7 @@ class MappingJob (object):
          className = element.getAttribute ('class')
 
       else:
-         raise MappingException, "'import' element missing required 'class' attribute."
+         raise MappingException, "Missing required attribute 'class' in 'import'."
       
       cl = ClassLoader ()
       cl.loadClass (className)

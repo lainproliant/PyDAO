@@ -9,6 +9,7 @@
            during code generation or from a schema xml file. -->
       <schema xml="CinciLMS.schema.xml"/>
       <schema type="MySQL" host="localhost" port="3306" login="root"/>
+      
       <!-- As many of the below options as necessary. --> 
       <!-- All DAO class generation defaults output to "DAO" folder
            in current directory. -->
