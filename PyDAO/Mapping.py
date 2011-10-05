@@ -28,27 +28,30 @@ import re
 # A regular expression pattern matching valid table and alias names.
 RE_VALID_NAME = "[A-Za-z_][A-Za-z0-9_]*"
 
-
 #--------------------------------------------------------------------
-def loadSchematizer (databaseType, *args, **kwargs):
-   """
-      Loads a schematizer object with the given parameters.
-   """
-
-   cl = ClassLoader ()
-   schematizerClass = cl.loadClass (SchematizerMapping [databaseType])
-   return schematizerClass (*args, **kwargs)
+class MappingException (PyDAOException): pass
 
 
 #--------------------------------------------------------------------
-def loadGenerator (language, *args, **kwargs):
+def interpretParameter (paramElement):
    """
-      Loads a generator object with the given parameters.
+      Interprets the contents of a 'param' element.  Such element 
+      must contain a 'name' and 'value' attribute.  These values
+      are returned as a 2-tuple.
+
+      If any of the required attributes are missing,
+      a MappingException is thrown.
    """
 
-   cl = ClassLoader ()
-   generatorClass = cl.loadClass (GeneratorMapping [language])
-   return generatorClass (*args, **kwargs)
+   if not paramElement.hasAttribute ('name'):
+      raise MappingException, "Missing required attribute 'name' in 'param'."
+
+   if not paramElement.hasAttribute ('value'):
+      raise MappingException, "Missing required attribute 'value' in 'param'."
+   
+   return (
+         paramElement.getAttribute ('name'),
+         paramElement.getAttribute ('value'))
 
 
 #--------------------------------------------------------------------
@@ -295,6 +298,9 @@ class DatabaseJob (object):
       self.allTables = False
       self.allTablesExplicit = False
 
+      self.compiled = False
+      self.complete = False
+
 
    @staticmethod
    def fromXML (databaseElement, mappingJob):
@@ -321,6 +327,43 @@ class DatabaseJob (object):
          elif element.tagName == 'table':
             databaseJob.interpretTable (element)
 
+
+   def interpretSchematizer (self, schemaElement):
+      """
+         Interprets a schema element.  Specifies and provides
+         parameters for the schematizer.
+      """
+      
+      schematizerType = None
+      params = OrderedDict ()
+
+      if schemaElement.hasAttribute ('xml'):
+         schematizerType = 'XML'
+         params ['inputFile'] = schemaElement.getAttribute ('xml')
+
+      elif schemaElement.hasAttribute ('type'):
+         schematizerType = schemaElement.getAttribute ('type')
+
+      else:
+         raise MappingException, "No schema source type provided in 'schema' element."
+
+      schematizerClass = getSchematizerClass (schematizerType)
+
+      if schematizerClass is None:
+         raise MappingException, "No schematizer registered for '%s'." % schematizerType
+
+      childElements = [e for e in schemaElement.childNodes if \
+            e.nodeType == Node.ELEMENT_NODE]
+
+      for element in childElements:
+         if element.tagName == 'param':
+            name, value = interpretParam (element)
+            params [name] = value
+
+         else:
+            raise MappingException, "Unexpected element '%s' in 'schema'." % element.tagName
+
+      
 
    def interpretTable (self, tableElement):
       """
@@ -355,6 +398,17 @@ class DatabaseJob (object):
 
       self.allTables = True
       self.allTablesExplicit = True
+
+
+   def compile (self):
+      """
+         Compile all of the pieces necessary for code generation.
+
+         Initializes the schematizer, then fetches the schema.
+         Then, applies any mapping aliases to the schema and
+         prepares the generator for code generation.
+      """
+
 
 
 #--------------------------------------------------------------------
@@ -395,7 +449,7 @@ class MappingJob (object):
             mappingJob.addJob (databaseJob)
 
          else:
-            raise MappingException, "Unrecognized element: '%s'" % element.tagName
+            raise MappingException, "Unexpected element '%s' in 'mapping'" % element.tagName
 
       return mappingJob
 

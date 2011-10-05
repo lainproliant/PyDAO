@@ -54,7 +54,7 @@ def reflectParameter (obj, parameter, value, allowSetVariable = False):
 
    try:
       attr = getattr (obj, parameter)
-      attr = value
+      setattr (obj, parameter, value)
       return
 
    except AttributeError, excVal:
