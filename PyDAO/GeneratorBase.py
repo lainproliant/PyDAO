@@ -23,26 +23,9 @@ class GeneratorBase (object):
    """
    
    __metaclass__ = ABCMeta
-   
-   def __init__ (self, schema = None):
-      """
-         Initializes the abstract portions of a Generator.
-      """
-
-      self.schema = schema
-      
-   
-   def setSchema (self, schema):
-      """
-         Sets the database schema for which to generate
-         an API.
-      """
-
-      self.schema = schema
-
-
+  
    @abstractmethod
-   def generate (self, outputDir = '.', overwrite = False):
+   def generate (self, schema, outputDir = '.', overwrite = False):
       """
          Writes classes to various output files in the given
          directory, the current working directory by default.

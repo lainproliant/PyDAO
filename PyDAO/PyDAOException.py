@@ -8,4 +8,8 @@
 #
 
 class PyDAOException (Exception):
-   pass
+   def __init__ (self, value, cause = None):
+      Exception.__init__ (self, value)
+      self.value = value
+      self.cause = cause
+

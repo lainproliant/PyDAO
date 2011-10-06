@@ -48,6 +48,25 @@ class IndentBase (object):
       pass
 
 
+   def __call__ (self, output):
+      """
+         Called when the object is treated as a functor.
+         This syntax is synonymous to calling println ().
+
+         EXAMPLE:
+
+         iw = IndentWriter ()
+         iw ("Hello,")
+         iw.println ("World!")
+
+         OUTPUT:
+         Hello,
+         World!
+      """
+
+      self.println (output)
+
+
    def write (self, output):
       """
          Print the given line to output,

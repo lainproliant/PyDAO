@@ -14,19 +14,25 @@
 # Released under the GNU General Public License, version 3.
 #
 
+import sys
+import xml.dom.minidom
+import re
+
 from abc import ABCMeta
 from collections import namedtuple, OrderedDict
 from PyDAOException import *
 from ClassLoader import *
-
-import Schematizers
-import Generators
-
-import xml.dom.minidom
-import re
+from xml.dom.minidom import Node
+from getpass import getpass
 
 # A regular expression pattern matching valid table and alias names.
 RE_VALID_NAME = "[A-Za-z_][A-Za-z0-9_]*"
+
+# A mapping of Schematizer class to schema type.
+SchematizerMapping = {}
+
+# A mapping of Generator class to language/API pair.
+GeneratorMapping = {}
 
 #--------------------------------------------------------------------
 class MappingException (PyDAOException): pass
@@ -41,17 +47,79 @@ def interpretParameter (paramElement):
 
       If any of the required attributes are missing,
       a MappingException is thrown.
+      
+      EXAMPLE:
+      <param name="host" value="localhost"/>
    """
 
    if not paramElement.hasAttribute ('name'):
-      raise MappingException, "Missing required attribute 'name' in 'param'."
+      raise MappingException ("Missing required attribute 'name' in 'param'.")
 
    if not paramElement.hasAttribute ('value'):
-      raise MappingException, "Missing required attribute 'value' in 'param'."
+      raise MappingException ("Missing required attribute 'value' in 'param'.")
    
    return (
-         paramElement.getAttribute ('name'),
-         paramElement.getAttribute ('value'))
+         str (paramElement.getAttribute ('name')),
+         str (paramElement.getAttribute ('value')))
+
+
+#--------------------------------------------------------------------
+def interpretParams (paramsElement):
+   """
+      Interprets the contents of a 'params' element.  Such element
+      contains an arbitrary list of attributes.  These attributes
+      and their values are stored in a dictionary and returned.
+      
+      EXAMPLE:
+      <params host="localhost" port="3306" user="dbuser" pass="dbpass"/>
+   """
+
+   params = OrderedDict ()
+   attrs = paramsElement.attributes
+   
+   for x in range (attrs.length):
+      attr = attrs.item (x)
+      params [str (attr.name)] = str (attr.value)
+
+   return params
+
+
+#--------------------------------------------------------------------
+def interpretInput (inputElement):
+   """
+      Interprets the contents of an 'input' element.  Such element
+      is a request to source information from the user at runtime.
+      Returns a two-tuple of attribute name and sourced value.
+
+      EXAMPLES:
+      <input prompt="Password:" hidden="true" name="passwd"/>
+      <input prompt="Hostname:" name="host"/> 
+   """
+
+   if not inputElement.hasAttribute ('name'):
+      raise MappingException ("Missing required attribute 'name' in 'input'.")
+   
+   name = inputElement.getAttribute ('name')
+   value = None
+   prompt = "%s: " % name
+   hidden = False
+
+   if inputElement.hasAttribute ('prompt'):
+      prompt = "%s " % inputElement.getAttribute ('prompt')
+
+   if inputElement.hasAttribute ('hidden'):
+      hiddenStr = inputElement.getAttribute ('hidden')
+      if hiddenStr.lower () == 'true':
+         hidden = True
+
+   if hidden:
+      value = getpass (prompt, sys.stderr)
+
+   else:
+      sys.stderr.write (prompt)
+      value = raw_input ()
+
+   return (name, value)
 
 
 #--------------------------------------------------------------------
@@ -103,7 +171,7 @@ class NamedObject (object):
 
 
 #--------------------------------------------------------------------
-class TableMappingJob (object):
+class TableMapping (object):
    """
       Keeps track of the mappings for tables, columns, and indexes.
 
@@ -113,7 +181,7 @@ class TableMappingJob (object):
    
    def __init__ (self, databaseJob = None):
       """
-         Initializes a TableMappingJob.
+         Initializes a TableMapping.
       """
 
       self.databaseJob = databaseJob
@@ -129,27 +197,27 @@ class TableMappingJob (object):
    @staticmethod
    def fromXML (tableElement, databaseJob):
       """
-         Creates a TableMappingJob from the given XML DOM element.
+         Creates a TableMapping from the given XML DOM element.
       """
       
-      tableJob = TableMappingJob (databaseJob)
+      tableJob = TableMapping (databaseJob)
       
       if tableElement.hasAttribute ('name'):
          name = tableElement.getAttribute ('name')
          
          if not re.match (RE_VALID_NAME, name):
-            raise MappingException, "Invalid name: '%s'." % name
+            raise MappingException ("Invalid name: '%s'." % name)
 
          tableJob.name = name
       
       else:
-         raise MappingException, "Missing required attribute 'name' in 'table'."
+         raise MappingException ("Missing required attribute 'name' in 'table'.")
 
       if tableElement.hasAttribute ('as'):
          alias = tableElement.getAttribute ('as')
 
          if not re.match (RE_VALID_NAME, alias):
-            raise MappingException, "Invalid alias: '%s'." % alias
+            raise MappingException ("Invalid alias: '%s'." % alias)
 
          tableJob.alias = alias
 
@@ -160,38 +228,38 @@ class TableMappingJob (object):
          if element.tagName == 'index':      # Interpret index mappings.
 
             if not element.hasAttribute ('name'):
-               raise MappingException, "Missing required attribute 'name' in 'index'."
+               raise MappingException ("Missing required attribute 'name' in 'index'.")
 
             indexName = element.getAttribute ('name')
             indexAlias = None
 
             if not re.match (RE_VALID_NAME, indexName):
-               raise MappingException, "Invalid name: '%s'." % indexName
+               raise MappingException ("Invalid name: '%s'." % indexName)
 
             if element.hasAttribute ('as'):
                indexAlias = element.getAttribute ('as')
 
             if not re.match (RE_VALID_NAME, indexAlias):
-               raise MappingException, "Invalid alias: '%s'." % indexAlias
+               raise MappingException ("Invalid alias: '%s'." % indexAlias)
 
             tableJob.mapIndex (indexName, indexAlias)
          
          if element.tagName == 'column':     # Interpret column mappings.
 
             if not element.hasAttribute ('name'):
-               raise MappingException, "Missing required attribute 'name' in 'column'."
+               raise MappingException ("Missing required attribute 'name' in 'column'.")
 
             columnName = element.getAttribute ('name')
             columnAlias = None
 
             if not re.match (RE_VALID_NAME, columnName):
-               raise MappingException, "Invalid name: '%s'." % columnName
+               raise MappingException ("Invalid name: '%s'." % columnName)
 
             if element.hasAttribute ('as'):
                columnAlias = element.getAttribute ('as')
 
             if not re.match (RE_VALID_NAME, columnAlias):
-               raise MappingException, "Invalid alias: '%s'." % columnAlias
+               raise MappingException ("Invalid alias: '%s'." % columnAlias)
 
             tableJob.mapColumn (columnName, columnAlias)
 
@@ -201,7 +269,9 @@ class TableMappingJob (object):
          if element.tagName == 'allindexes':  # Interpret allindexes mapping.
             tableJob.mapAllIndexes ()
 
-   
+      return tableJob
+  
+
    def mapColumn (self, columnName, columnAlias = None):
       """
          Adds a column to include in the mapping, and optionally
@@ -261,7 +331,7 @@ class TableMappingJob (object):
       tableSchema = schema.getTable (self.name)
 
       if tableSchema is None:
-         raise MappingException, "The given database '%s' does not contain a table named '%s'." % (schema.getName (), self.name)
+         raise MappingException ("The given database '%s' does not contain a table named '%s'." % (schema.getName () (self.name)))
 
       if self.alias is not None:
          tableSchema.setAlias (self.alias)
@@ -271,7 +341,7 @@ class TableMappingJob (object):
          columnAlias = self.columnMapping [columnName]
 
          if columnSchema is None:
-            raise MappingException, "The given table '%s.%s' does not contain a column named '%s'." % (schema.getName (), tableSchema.getName (), columnName)
+            raise MappingException ("The given table '%s.%s' does not contain a column named '%s'." % (schema.getName (), tableSchema.getName (), columnName))
 
          if columnAlias is not None:
             columnSchema.setAlias (columnAlias)
@@ -292,8 +362,9 @@ class DatabaseJob (object):
       self.schematizer = None
       self.generator = None
       self.schema = None
+      self.outputPath = '.'
 
-      self.tableMapping = OrderedDict ()
+      self.tableMappings = OrderedDict ()
 
       self.allTables = False
       self.allTablesExplicit = False
@@ -327,6 +398,8 @@ class DatabaseJob (object):
          elif element.tagName == 'table':
             databaseJob.interpretTable (element)
 
+      return databaseJob
+
 
    def interpretSchematizer (self, schemaElement):
       """
@@ -335,44 +408,117 @@ class DatabaseJob (object):
       """
       
       schematizerType = None
+      schematizerClassName = None
+      schematizerClass = None
       params = OrderedDict ()
 
+      # The 'xml' attribute declares the usage of the special XML schematizer.
+      # This schematizer simply loads an XML definiton of the schema from a file.
       if schemaElement.hasAttribute ('xml'):
          schematizerType = 'XML'
-         params ['inputFile'] = schemaElement.getAttribute ('xml')
+         params ['filename'] = schemaElement.getAttribute ('xml')
 
       elif schemaElement.hasAttribute ('type'):
          schematizerType = schemaElement.getAttribute ('type')
+      
+      elif schemaElement.hasAttribute ('class'):
+         schematizerClassName = schemaElement.getAttribute ('class')
 
       else:
-         raise MappingException, "No schema source type provided in 'schema' element."
+         raise MappingException ("No schema source type provided in 'schema' element.")
 
-      schematizerClass = getSchematizerClass (schematizerType)
+      # Fetch which class of schematizer should be used.
+      # This will throw an exception if a schematizer is not defined
+      # for the type given, or the given class name can't be loaded.
+      if schematizerClassName is not None:
+         cl = ClassLoader ()
+         schematizerClass = cl.loadClass (schematizerClassName)
 
-      if schematizerClass is None:
-         raise MappingException, "No schematizer registered for '%s'." % schematizerType
+      else:
+         schematizerClass = getSchematizer (schematizerType)
 
       childElements = [e for e in schemaElement.childNodes if \
             e.nodeType == Node.ELEMENT_NODE]
-
+      
+      # Load parameter elements.
       for element in childElements:
          if element.tagName == 'param':
             name, value = interpretParam (element)
             params [name] = value
 
-         else:
-            raise MappingException, "Unexpected element '%s' in 'schema'." % element.tagName
+         elif element.tagName == 'params':
+            newParams = interpretParams (element) 
+            params.update (newParams)
 
+         elif element.tagName == 'input':
+            name, value = interpretInput (element)
+            params [name] = value
+            
+         else:
+            raise MappingException ("Unexpected element '%s' in 'schema'." % element.tagName)
       
+      # Pass elements to the constructor of the schematizer class.
+      self.schematizer = schematizerClass (**params)
+
+
+   def interpretGenerator (self, generatorElement):
+      """
+         Interprets a generate element.  Specifies and provides
+         parameters for the generator.
+      """
+      
+      languagePair = None
+      generatorClassName = None
+      generatorClass = None
+      params = OrderedDict ()
+      
+      if generatorElement.hasAttribute ('code'):
+         languagePair = generatorElement.getAttribute ('code')
+
+      elif generatorElement.hasAttribute ('class'):
+         generatorClassName = generatorElement.getAttribute ('class')
+
+      else:
+         raise MappingException ("No language/API pair ('code') provided in 'generator' element.")
+
+      if generatorElement.hasAttribute ('out'):
+         self.outputPath = generatorElement.getAttribute ('out') 
+
+
+      if generatorClassName is not None:
+         cl = ClassLoader ()
+         generatorClass = cl.loadClass (generatorClassName)
+
+      else:
+         generatorClass = getGenerator (languagePair)
+
+      childElements = [e for e in generatorElement.childNodes if \
+            e.nodeType == Node.ELEMENT_NODE]
+      
+      # Load parameter elements.
+      for element in childElements:
+         if element.tagName == 'param':
+            name, value = interpretParam (element)
+            params [name] = value
+
+         if element.tagName == 'params':
+            newParams = interpretParams (element) 
+            params.update (newParams)
+            
+         else:
+            raise MappingException ("Unexpected element '%s' in 'generate'." % element.tagName)
+
+      self.generator = generatorClass (**params)
+
 
    def interpretTable (self, tableElement):
       """
          Interprets a table element.  Passes the element
-         into TableMappingJob.fromXML () and adds to table
+         into TableMapping.fromXML () and adds to table
          mappings.
       """
       
-      tableJob = TableMappingJob.fromXML (tableElement, self)
+      tableJob = TableMapping.fromXML (tableElement, self)
       self.mapTable (tableJob)
    
 
@@ -381,10 +527,10 @@ class DatabaseJob (object):
          Adds the given table mapping job to this job.
       """
 
-      if not self.tableMapping and not self.allTablesExplicit:
+      if not self.tableMappings and not self.allTablesExplicit:
          self.allTables = False
 
-      self.tableMapping [tableJob.name] = tableJob
+      self.tableMappings [tableJob.name] = tableJob
 
 
    def mapAllTables (self):
@@ -400,15 +546,31 @@ class DatabaseJob (object):
       self.allTablesExplicit = True
 
 
-   def compile (self):
+   def runJob (self):
       """
          Compile all of the pieces necessary for code generation.
-
-         Initializes the schematizer, then fetches the schema.
-         Then, applies any mapping aliases to the schema and
-         prepares the generator for code generation.
+         
       """
+      
+      schema = None
+      
+      # If allTables is specified, bring all tables into
+      # the schema.  Otherwise, only source the tables
+      # which were specified in the mapping.
 
+      if self.allTables:
+         schema = self.schematizer.schematize ()
+
+      else:
+         schema = self.schematizer.schematize (
+               self.tableMappings.keys ())
+      
+
+      for tableName in self.tableMappings:
+         self.tableMappings [tableName].applyMapping (schema)
+      
+      
+      self.generator.generate (schema, self.outputPath)
 
 
 #--------------------------------------------------------------------
@@ -424,7 +586,16 @@ class MappingJob (object):
       
       self.document = None
       self.databaseJobs = []
-  
+ 
+
+   @staticmethod
+   def loadFromXML (xmlFile):
+      """
+         Loads a mapping process from an XML file.
+      """
+
+      return MappingJob.fromXML (xml.dom.minidom.parse (xmlFile))
+
 
    @staticmethod
    def fromXML (document):
@@ -435,7 +606,7 @@ class MappingJob (object):
       mappingJob = MappingJob ()
 
       if document.documentElement.tagName != 'mapping':
-         raise MappingException, "Invalid document element, must be 'mapping'."
+         raise MappingException ("Invalid document element, must be 'mapping'.")
      
       childElements = [e for e in document.documentElement.childNodes if \
             e.nodeType == Node.ELEMENT_NODE]
@@ -445,11 +616,11 @@ class MappingJob (object):
             mappingJob.interpretImport (element)
 
          elif element.tagName == 'database':
-            databaseJob = DatabaseJob.fromXML (mappingJob, element)
+            databaseJob = DatabaseJob.fromXML (element, mappingJob)
             mappingJob.addJob (databaseJob)
 
          else:
-            raise MappingException, "Unexpected element '%s' in 'mapping'" % element.tagName
+            raise MappingException ("Unexpected element '%s' in 'mapping'" % element.tagName)
 
       return mappingJob
 
@@ -465,11 +636,18 @@ class MappingJob (object):
          className = element.getAttribute ('class')
 
       else:
-         raise MappingException, "Missing required attribute 'class' in 'import'."
+         raise MappingException ("Missing required attribute 'class' in 'import'.")
       
       cl = ClassLoader ()
       cl.loadClass (className)
 
+
+   def addJob (self, databaseJob):
+      """
+         Adds a DatabaseJob task to this job.
+      """
+      
+      self.databaseJobs.append (databaseJob)
 
    def runJob (self):
       """
@@ -479,4 +657,30 @@ class MappingJob (object):
       for databaseJob in self.databaseJobs:
          databaseJob.runJob ()
 
+
+#--------------------------------------------------------------------
+def registerSchematizer (schemaType, schematizerClass):
+   SchematizerMapping [schemaType] = schematizerClass
+
+
+#--------------------------------------------------------------------
+def registerGenerator (languagePair, generatorClass):
+   GeneratorMapping [languagePair] = generatorClass
+
+
+#--------------------------------------------------------------------
+def getSchematizer (schemaType):
+   if not SchematizerMapping.has_key (schemaType):
+      raise MappingException ("No schematizer registered for type '%s'." % schemaType)
+
+   return SchematizerMapping [schemaType]
+
+
+#--------------------------------------------------------------------
+def getGenerator (languagePair):
+   if not GeneratorMapping.has_key (languagePair):
+      raise MappingException ("No generator registered for language/API pair '%s'." % (
+            languagePair))
+
+   return GeneratorMapping [languagePair]
 

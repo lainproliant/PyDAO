@@ -1,0 +1,28 @@
+<database name="CinciLMS">
+   <table name="Users">
+      <column name="UserID" type="int" nullable="False"/>
+      <column name="ExternalID" type="int" nullable="True"/>
+      <column name="Username" type="varchar" nullable="True"/>
+      <column name="FirstName" type="varchar" nullable="True"/>
+      <column name="MiddleInitial" type="char" nullable="True"/>
+      <column name="LastName" type="varchar" nullable="True"/>
+      <column name="EmailAddress" type="varchar" nullable="True"/>
+      <column name="PasswordSalt" type="char" nullable="True"/>
+      <column name="PasswordHash" type="char" nullable="True"/>
+      <column name="Notes" type="text" nullable="True"/>
+      <column name="LastLogin" type="date" nullable="True"/>
+      <column name="IsActive" type="tinyint" nullable="False"/>
+      <column name="SystemRole" type="int" nullable="False"/>
+   
+      <index name="PRIMARY" unique="True">
+         <column name="UserID"/>
+      </index>
+      <index name="Username" unique="True">
+         <column name="Username"/>
+      </index>
+      <index name="ExternalID" unique="False">
+         <column name="ExternalID"/>
+      </index>
+   </table>
+
+</database>

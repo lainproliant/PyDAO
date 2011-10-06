@@ -15,6 +15,11 @@
 from PyDAO.SchematizerException import *
 from PyDAO.SchematizerBase import *
 from PyDAO.Schema import *
+from PyDAO.Mapping import registerSchematizer
+
+import MySQLdb
+
+QUERY_SCHEMA_FAILED_MSG = "Failed to query information schema."
 
 #--------------------------------------------------------------------
 class MySQLSchematizerException (SchematizerException): pass
@@ -30,25 +35,30 @@ class MySQLSchematizer (SchematizerBase):
       the Schematizer.schematize () method.
    """
    
-   def __init__ (self, mysqlConnection, databaseName):
+   def __init__ (self, **kwargs):
       """
          Initializes a MySQLSchematizer.
-
-         mysqlConnection:
-            An open MySQLdb connection object.  
-            Must have read access to the `information_schema`
-            database.
-
-            This connection will be automatically closed
-            once the object is cleaned up, or can be
-            closed by calling closeConnection ().
-
-         databaseName:
-            The name of the database to be schematized.
       """
       
-      self._mysqlConnection = mysqlConnection
-      self.databaseName = databaseName
+      self.databaseName = kwargs.pop ('database')
+      self._mysqlConnection = None
+
+      if kwargs.has_key ('dbconn'):
+         self._mysqlConnection = kwargs ['dbconn']
+
+      else:
+         try:
+            if kwargs.has_key ('port'):
+               kwargs ['port'] = int (kwargs ['port'])
+
+            self._mysqlConnection = MySQLdb.connect (**kwargs)
+
+         except MySQLdb.Error as mysqlError:
+            raise MySQLSchematizerException ("Error connecting to database.", mysqlError)
+         
+         except ValueError as valueError:
+            raise MySQLSchematizerException ("Value '%s' for 'port' is not an integer." % (
+               kwargs ['port']), valueError)
 
 
    def __del__ (self):
@@ -118,17 +128,21 @@ class MySQLSchematizer (SchematizerBase):
       
       index = IndexSchema (indexName, nonUnique)
 
-      cursor = self.getConnection ().cursor ()
+      try:
+         cursor = self.getConnection ().cursor ()
+      
+         cursor.execute ("""
+            select column_name
+               from information_schema.statistics
 
-      cursor.execute ("""
-         select column_name
-            from information_schema.statistics
+            where table_schema = %s and table_name = %s
+               and index_name = %s
 
-         where table_schema = %s and table_name = %s
-            and index_name = %s
-
-         order by seq_in_index
-         """, (self.getDatabaseName (), tableName, indexName))
+            order by seq_in_index
+            """, (self.getDatabaseName (), tableName, indexName))
+      
+      except MySQLdb.Error as mysqlError:
+         raise MySQLSchematizerException (QUERY_SCHEMA_FAILED_MSG, mysqlError)
 
       results = cursor.fetchall ()
 
@@ -179,18 +193,22 @@ class MySQLSchematizer (SchematizerBase):
          Retrieves the names of all of the tables in the database.
       """
       
-      cursor = self.getConnection ().cursor ()
-
-      cursor.execute ("""
-         select table_name from information_schema.tables where
-            table_schema = %s
-         """, (self.databaseName,))
+      try:
+         cursor = self.getConnection ().cursor ()
+      
+         cursor.execute ("""
+            select table_name from information_schema.tables where
+               table_schema = %s
+            """, (self.databaseName,))
+      
+      except MySQLdb.Error as mysqlError:
+         raise MySQLSchematizerException (QUERY_SCHEMA_FAILED_MSG, mysqlError)
 
       results = cursor.fetchall ()
       cursor.close ()
 
       if not results:
-         raise MySQLSchematizerException, 'The database "%s" does not exist or has no tables.' % self.databaseName
+         raise MySQLSchematizerException ('The database "%s" does not exist or has no tables.' % self.databaseName)
 
       tableNames = [row [0] for row in results]
       return tableNames
@@ -203,20 +221,24 @@ class MySQLSchematizer (SchematizerBase):
       
       columns = []
 
-      cursor = self.getConnection ().cursor ()
+      try:
+         cursor = self.getConnection ().cursor ()
+      
+         cursor.execute ("""
+            select column_name, data_type, is_nullable, extra
+               from information_schema.columns
 
-      cursor.execute ("""
-         select column_name, data_type, is_nullable, extra
-            from information_schema.columns
+            where table_schema = %s and table_name = %s
+            """, (self.getDatabaseName (), tableName))
 
-         where table_schema = %s and table_name = %s
-         """, (self.getDatabaseName (), tableName))
+      except MySQLdb.Error as mysqlError:
+         raise MySQLSchematizerException (QUERY_SCHEMA_FAILED_MSG, mysqlError)
 
       results = cursor.fetchall ()
       cursor.close ()
       
       if not results:
-         raise MySQLSchematizerException, 'The table "%s.%s" does not exist or has no columns.' % (databaseName, tableName)
+         raise MySQLSchematizerException ('The table "%s.%s" does not exist or has no columns.' % (databaseName (tableName)))
 
       for row in results:
          column = self.schematizeColumn (*row)
@@ -231,15 +253,19 @@ class MySQLSchematizer (SchematizerBase):
       """
 
       indexes = []
+      
+      try:
+         cursor = self.getConnection ().cursor ()
 
-      cursor = self.getConnection ().cursor ()
+         cursor.execute ("""
+            select distinct index_name, non_unique
+               from information_schema.statistics
 
-      cursor.execute ("""
-         select distinct index_name, non_unique
-            from information_schema.statistics
+            where table_schema = %s and table_name = %s
+            """, (self.getDatabaseName (), tableName))
 
-         where table_schema = %s and table_name = %s
-         """, (self.getDatabaseName (), tableName))
+      except MySQLdb.Error as mysqlError:
+         raise MySQLSchematizerException (QUERY_SCHEMA_FAILED_MSG, mysqlError)
 
       results = cursor.fetchall ()
 
@@ -257,18 +283,22 @@ class MySQLSchematizer (SchematizerBase):
       """
 
       constraint = None
+      
+      try:
+         cursor = self.getConnection ().cursor ()
 
-      cursor = self.getConnection ().cursor ()
+         cursor.execute ("""
+            select constraint_type
+               from information_schema.table_constraints
 
-      cursor.execute ("""
-         select constraint_type
-            from information_schema.table_constraints
+            where 
+               table_schema = %s and
+               table_name = %s and
+               constraint_name = %s
+         """, (self.getDatabaseName (), tableName))
 
-         where 
-            table_schema = %s and
-            table_name = %s and
-            constraint_name = %s
-      """, (self.getDatabaseName (), tableName))
+      except MySQLdb.Error as mysqlError:
+         raise MySQLSchematizerException (QUERY_SCHEMA_FAILED_MSG, mysqlError)
 
       result = cursor.fetchone ()
 
@@ -280,3 +310,8 @@ class MySQLSchematizer (SchematizerBase):
          return None
 
       
+#--------------------------------------------------------------------
+# Register this schematizer in PyDAO.Mapping.
+
+registerSchematizer ('MySQL', MySQLSchematizer)
+

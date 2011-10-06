@@ -44,8 +44,8 @@ class ClassLoader (object):
          try:
             module = getattr (module, component)
          
-         except AttributeError, excVal:
-            raise ClassLoaderException, excVal
+         except AttributeError as excVal:
+            raise ClassLoaderException (excVal)
 
       return module
 
@@ -58,7 +58,7 @@ class ClassLoader (object):
       path = objectName.split ('.')
 
       if len (path) < 2:
-         raise ClassLoaderException, "Invalid object path: %s" % objectName
+         raise ClassLoaderException ("Invalid object path: %s" % objectName)
 
       modulePath = '.'.join (path [:-1])
       objectBaseName = path [-1]
@@ -68,8 +68,8 @@ class ClassLoader (object):
       try:
          obj = getattr (module, objectBaseName)
 
-      except AttributeError, excVal:
-         raise ClassLoaderException, excVal
+      except AttributeError as excVal:
+         raise ClassLoaderException (excVal)
 
       return obj
 
@@ -84,7 +84,7 @@ class ClassLoader (object):
       obj = self.loadFromModule (className)
 
       if not inspect.isclass (obj):
-         raise ClassLoaderException, 'Object "%s" is not a class.' % obj
+         raise ClassLoaderException ('Object "%s" is not a class.' % obj)
 
       return obj
 

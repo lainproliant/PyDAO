@@ -25,7 +25,7 @@ def getSchema ():
    if tableInput and tableInput != 'ALL':
       tables = tableInput.split (',')
 
-   schematizer = MySQLSchematizer (db, databaseName)
+   schematizer = MySQLSchematizer (dbconn = db, database = databaseName)
    return schematizer.schematize (tables)
 
 if __name__ == "__main__":

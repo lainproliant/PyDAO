@@ -8,7 +8,7 @@
 # Released under the GNU General Public License, version 3.
 #
 
-from PyDAO.SchematizerException import *
+from PyDAO.GeneratorException import *
 from PyDAO.GeneratorBase import *
 
 class MySQLiGenerator (GeneratorBase):

@@ -1,26 +1,17 @@
 <?xml version="1.0"?>
 <!-- This is an example mapping file for PyDAO. -->
 <mapping>
-   <import class="LeeDAO.Schematizers.PostgreSQLSchematizer"/>
-
    <database name="CinciLMS">
       <!-- One or the other of the two below options.
            The schema used for generation can be sourced
            during code generation or from a schema xml file. -->
-      <schema xml="CinciLMS.schema.xml"/>
-      <schema type="MySQL" database="CinciLMS">
-         <param name="host" value="localhost"/>
-         <param name="port" value="3306"/>
-         <param name="user" value="root"/>
-         <param name="pass" value="something"/>
+      <schema type="MySQL">
+         <params database="CinciLMS" host="localhost" port="3306"
+            user="root"/>
+         <input prompt="MySQL Password:" hidden="true" name="passwd"/>
       </schema>
-      
-      <!-- As many of the below options as necessary. --> 
-      <!-- All DAO class generation defaults output to "DAO" folder
-           in current directory. -->
-      <generate code="PHP/MySQLi" out="DAO"/>
-      <!-- Generates <databaseName>.schema.xml by default. -->
-      <generate code="xml" out="CinciLMS.schema.xml"/>
+
+      <generate code="XML" out="cincilms.schema.xml"/>
       
       <!-- By default, all tables are included if no table
            elements exist.  If any table elements exist,
@@ -29,7 +20,7 @@
            and then individual table elements if you want
            to include every table but want special mapping
            for some tables. -->
-      <alltables/>
+      <!--<alltables/>-->
 
       <table name="Users">
          <!-- By default, all columns are included if no
@@ -38,7 +29,7 @@
               is specified.  Only indexes referenced by name are
               included unless allindexes is specified. -->
          <index name="Username" as="LoginName"/>
-         <column name="Password" as="PasswordHash"/>
+         <column name="PasswordHash" as="PasswordHash"/>
       </table>
    </database>
 </mapping>

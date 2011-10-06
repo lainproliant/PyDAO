@@ -41,7 +41,7 @@ def reflectParameter (obj, parameter, value, allowSetVariable = False):
    try:
       setter = getattr (obj, attrName)
 
-   except AttributeError, excVal:
+   except AttributeError as excVal:
       pass
 
    if setter is not None:
@@ -57,9 +57,9 @@ def reflectParameter (obj, parameter, value, allowSetVariable = False):
       setattr (obj, parameter, value)
       return
 
-   except AttributeError, excVal:
+   except AttributeError as excVal:
       if not allowSetVariable:
-         raise ReflectionException, excVal + 'or \'%s\'' % (attrName)
+         raise ReflectionException (excVal + 'or \'%s\'' % (attrName))
 
 
    #-----------------------------------------------------------------
@@ -69,6 +69,6 @@ def reflectParameter (obj, parameter, value, allowSetVariable = False):
       setattr (obj, parameter, value)
       return
 
-   except Exception, excVal:
-      raise ReflectionException, excVal
-   
+   except Exception as excVal:
+      raise ReflectionException (excVal)
+
