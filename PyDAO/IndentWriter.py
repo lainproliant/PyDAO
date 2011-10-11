@@ -48,7 +48,7 @@ class IndentBase (object):
       pass
 
 
-   def __call__ (self, output):
+   def __call__ (self, output = None):
       """
          Called when the object is treated as a functor.
          This syntax is synonymous to calling println ().
@@ -63,8 +63,11 @@ class IndentBase (object):
          Hello,
          World!
       """
-
-      self.println (output)
+      
+      if output is None:
+         self.newline ()
+      else:
+         self.println (output)
 
 
    def write (self, output):

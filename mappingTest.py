@@ -1,6 +1,5 @@
-from PyDAO import MappingJob
+from PyDAO import SchemaMapping
 
-mapping = MappingJob.loadFromXML ('mapping.pydao.xml')
-mapping.runJob ()
-
+mapping = SchemaMapping.loadFromXML ('mapping.pydao.xml')
+mapping.runJob (overwrite = True)
 

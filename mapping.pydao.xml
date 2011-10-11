@@ -11,7 +11,8 @@
          <input prompt="MySQL Password:" hidden="true" name="passwd"/>
       </schema>
 
-      <generate code="XML" out="cincilms.schema.xml"/>
+      <!--<generate code="XML" out="cincilms.schema.xml"/>-->
+      <generate code="PHP/MySQLi" out="build"/> 
       
       <!-- By default, all tables are included if no table
            elements exist.  If any table elements exist,
@@ -20,17 +21,18 @@
            and then individual table elements if you want
            to include every table but want special mapping
            for some tables. -->
-      <!--<alltables/>-->
+      <alltables/>
 
       <table name="Users">
-         <!-- By default, all columns are included if no
+         <!--By default, all columns are included if no
               column elements exist.  If any column elements exist,
               only those columns are included, unless allcolumns is
               is specified.  Only indexes referenced by name are
-              included unless allindexes is specified. -->
-         <index name="Username" as="LoginName"/>
-         <column name="PasswordHash" as="PasswordHash"/>
-      </table>
+              included unless allindexes is specified.-->
+         <column name="Username" as="LoginName"/>
+         <column name="PasswordHash" as="PasswordHashThing"/>
+         <allcolumns/>
+      </table>-->
    </database>
 </mapping>
 

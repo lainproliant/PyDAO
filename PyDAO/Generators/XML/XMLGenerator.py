@@ -34,9 +34,10 @@ class XMLGenerator (GeneratorBase):
       GeneratorBase.__init__ (self)
 
 
-   def generate (self, schema, outputDir = '.', overwrite = False):
+   def generate (self, schema, outputPath = '.', overwrite = False):
       """
-         Writes a single Schema XML file to 'outputDir' (full path name).
+         Writes a single Schema XML file to 'outputDir', the full path
+         name of the file to be written.
       """
       
       if os.path.exists (outputDir) and not overwrite:
@@ -49,5 +50,5 @@ class XMLGenerator (GeneratorBase):
 
 #--------------------------------------------------------------------
 # Register this generator in PyDAO.Mapping.
-
+#
 registerGenerator ('XML', XMLGenerator)

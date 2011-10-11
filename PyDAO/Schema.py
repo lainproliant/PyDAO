@@ -131,9 +131,9 @@ class TableSchema (NamedObject):
       # A list of the indexes in the table.
       self.indexes = []
 
-      # An list of zero or more columns in the table's primary key.
-      self.primaryKey = []
-      
+      # An IndexSchema for the table's primary key, if it exists.
+      self.primaryKey = None
+
       # A map of column names to columns, for fast lookups.
       # columnName: col
       self.columnMap = {}

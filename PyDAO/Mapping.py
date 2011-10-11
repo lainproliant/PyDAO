@@ -17,6 +17,7 @@
 import sys
 import xml.dom.minidom
 import re
+import copy
 
 from abc import ABCMeta
 from collections import namedtuple, OrderedDict
@@ -345,17 +346,128 @@ class TableMapping (object):
 
          if columnAlias is not None:
             columnSchema.setAlias (columnAlias)
-          
+
+      for indexName in self.indexMapping:
+         indexSchema = tableSchema.getIndex (indexName)
+         indexAlias = self.indexMapping [indexName]
+
+         if indexSchema is None:
+            raise MappingException ("The given table '%s.%s' does not contain an index named '%s'." % (schema.getName (), tableSchema.getName (), indexName))
+
+
+   def getAlias (self):
+      """
+         Gets the alias of this table.
+      """
+
+      return self.alias
+
+
+   def getColumnAlias (self, columnName):
+      """
+         Gets the alias of the given column.
+         Returns the name provided if there is no alias.
+      """
+
+      if self.columnMapping.has_key (columnName):
+         return self.columnMapping [columnName]
+
+      else:
+         return columnName
+
+
+   def getAllColumns (self):
+      """
+         Gets a list of all columns in the mapping.
+      """
+
+      return self.columnMapping
+
+
+   def getMappedColumns (self, tableSchema):
+      """
+         Gets a list of all columns in the schema
+         which are in the mapping.
+
+         If <allcolumns/> was specified, this list
+         contains all of the columns from the schema.
+
+         This method does not verify that the items
+         in the mapping actually exist in the schema.
+      """
+
+      if self.shouldAllColumns ():
+         return tableSchema.getColumnNames ()
+
+      else:
+         return self.getAllColumns ()
+   
+
+   def getIndexAlias (self, indexName):
+      """
+         Gets the alias fo the given index.
+         Returns the name provided if there is no alias.
+      """
+
+      if self.indexMapping.has_key (indexName):
+         return self.indexMapping [indexName]
+
+      else:
+         return indexName
+
+
+   def getAllIndexes (self):
+      """
+         Gets a list of all index mappings.
+      """
+
+      return self.indexMapping
+
+
+   def getMappedIndexes (self, tableSchema):
+      """
+         Gets a list of all indexes in the schema
+         which are in the mapping.
+
+         If <allindexes/> was specified, this list
+         contains all of the indexes from the schema.
+
+         This method does not verify that the items
+         in the mapping actually exist in the schema.
+      """
+
+      if self.shouldAllIndexes ():
+         return tableSchema.getIndexNames ()
+
+      else:
+         return self.getAllIndexes ()
+
+
+   def shouldAllColumns (self):
+      """
+         Determine whether all columns should be mapped.
+      """
+
+      return self.allColumns
+
+
+   def shouldAllIndexes (self):
+      """
+         Determine whether all indexes should be mapped.
+      """
+
+      return self.allIndexes
+
 
 #--------------------------------------------------------------------
-class DatabaseJob (object):
+class DatabaseMapping (object):
    """
       Represents a DAO generation job for a particular database.
    """
 
    def __init__ (self, mappingJob = None):
       """
-         Initializes a DatabaseJob. 
+         Initializes a DatabaseMapping. 
       """
 
       self.mappingJob = mappingJob
@@ -369,18 +481,15 @@ class DatabaseJob (object):
       self.allTables = False
       self.allTablesExplicit = False
 
-      self.compiled = False
-      self.complete = False
-
 
    @staticmethod
    def fromXML (databaseElement, mappingJob):
       """
-         Creates a DatabaseJob from the given XML element
+         Creates a DatabaseMapping from the given XML element
          within the given mapping job.
       """
 
-      databaseJob = DatabaseJob (mappingJob)
+      databaseJob = DatabaseMapping (mappingJob)
 
       childElements = [e for e in databaseElement.childNodes if \
             e.nodeType == Node.ELEMENT_NODE]
@@ -533,6 +642,36 @@ class DatabaseJob (object):
       self.tableMappings [tableJob.name] = tableJob
 
 
+   def getAllTables (self):
+      """
+         Gets the names of all tables in the database mapping.
+      """
+
+      return self.tableMappings.keys ()
+
+   
+   def getTableMapping (self, tableName):
+      """
+         Gets the TableMapping for the given table,
+         or None if there is no mapping.
+      """
+
+      if self.tableMappings.has_key (tableName):
+         return self.tableMappings [tableName]
+
+      else:
+         return None
+
+   
+   def getAllTableMappings (self):
+      """
+         Returns an OrderedDict of all table mappings
+         which were specified for the database.
+      """
+
+      return self.tableMappings
+
+
    def mapAllTables (self):
       """
          Specifies that all tables in the database schema
@@ -546,10 +685,60 @@ class DatabaseJob (object):
       self.allTablesExplicit = True
 
 
-   def runJob (self):
+   def shouldAllTables (self):
+      """
+         Determines whether all tables should be mapped.
+      """
+
+      return self.allTables
+   
+
+   def cullSchema (self, schema):
+      """
+         Remove all elements of the schema not contained
+         within the mapping.
+      """
+      
+      mappingTables = self.getAllTables ()
+      mappingTableSet = set (mappingTables)
+      schemaTables = schema.getTableNames ()
+      
+      if not self.shouldAllTables ():
+         tablesToCull = [t for t in schemaTables if t not in mappingTableSet]
+
+         for tableName in tablesToCull:
+            schema.removeTable (tableName)
+
+      for tableName in mappingTables:
+         tableSchema = schema.getTable (tableName)
+         tableMapping = self.getTableMapping (tableName)
+
+         mappingColumns = tableMapping.getAllColumns ()
+         mappingColumnSet = set (mappingColumns)
+         schemaColumns = tableSchema.getColumnNames ()
+         
+         if not tableMapping.shouldAllColumns ():
+            columnsToCull = [c for c in schemaColumns if c not in mappingColumnSet]
+
+            for columnName in columnsToCull:
+               tableSchema.removeColumn (columnName)
+         
+         mappingIndexes = tableMapping.getAllIndexes ()
+         mappingIndexSet = set (mappingIndexes)
+         schemaIndexes = tableSchema.getIndexNames ()
+
+         if not tableMapping.shouldAllIndexes ():
+            indexesToCull = [i for i in schemaIndexes if i not in mappingIndexSet]
+
+            for indexName in indexesToCull:
+               tableSchema.removeIndex (indexName)
+
+
+   def runJob (self, overwrite=False):
       """
          Compile all of the pieces necessary for code generation.
-         
+
+         Passes the database schema into generator's generate method.
       """
       
       schema = None
@@ -564,24 +753,23 @@ class DatabaseJob (object):
       else:
          schema = self.schematizer.schematize (
                self.tableMappings.keys ())
-      
 
       for tableName in self.tableMappings:
          self.tableMappings [tableName].applyMapping (schema)
+         self.cullSchema (schema)
       
-      
-      self.generator.generate (schema, self.outputPath)
+      self.generator.generate (schema, self.outputPath, overwrite)
 
 
 #--------------------------------------------------------------------
-class MappingJob (object):
+class SchemaMapping (object):
    """
       A controller object for the DAO class generation process.
    """
 
    def __init__ (self):
       """
-         Initializes a MappingJob.
+         Initializes a SchemaMapping.
       """
       
       self.document = None
@@ -594,7 +782,7 @@ class MappingJob (object):
          Loads a mapping process from an XML file.
       """
 
-      return MappingJob.fromXML (xml.dom.minidom.parse (xmlFile))
+      return SchemaMapping.fromXML (xml.dom.minidom.parse (xmlFile))
 
 
    @staticmethod
@@ -603,7 +791,7 @@ class MappingJob (object):
          Loads a mapping process from XML DOM.
       """
       
-      mappingJob = MappingJob ()
+      mappingJob = SchemaMapping ()
 
       if document.documentElement.tagName != 'mapping':
          raise MappingException ("Invalid document element, must be 'mapping'.")
@@ -616,7 +804,7 @@ class MappingJob (object):
             mappingJob.interpretImport (element)
 
          elif element.tagName == 'database':
-            databaseJob = DatabaseJob.fromXML (element, mappingJob)
+            databaseJob = DatabaseMapping.fromXML (element, mappingJob)
             mappingJob.addJob (databaseJob)
 
          else:
@@ -644,18 +832,19 @@ class MappingJob (object):
 
    def addJob (self, databaseJob):
       """
-         Adds a DatabaseJob task to this job.
+         Adds a DatabaseMapping task to this job.
       """
       
       self.databaseJobs.append (databaseJob)
 
-   def runJob (self):
+
+   def runJob (self, overwrite = False):
       """
          Runs the mapping job.
       """
 
       for databaseJob in self.databaseJobs:
-         databaseJob.runJob ()
+         databaseJob.runJob (overwrite)
 
 
 #--------------------------------------------------------------------
