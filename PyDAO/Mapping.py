@@ -319,6 +319,41 @@ class TableMapping (object):
       self.allColumns = True
       self.allColumnsExplicit = True
 
+   
+   def checkAliasIntegrity (self, schema, exceptions = True):
+      """
+         Checks the integrity of aliases in this table mapping.
+         No two column or index aliases may be the same,
+         and may not share a name with the real name of
+         another column or index on the same table.
+
+         If the integrity check fails, a MappingException
+         is thrown by default.  If 'exceptions' is False,
+         False is returned instead.
+      """
+      
+      aliasNameSet = set ()
+
+      realNameSet = set (schema.getColumnNames ()) | set (schema.getIndexNames ())
+      aliasNameList = self.columnMapping.keys () + self.indexMapping.keys ()
+
+      for alias in aliasNameList:
+         if alias in realNameSet:
+            if not exceptions:
+               raise MappingException ("Alias '%s' may not share a name with a column or index on this table." % alias)
+            else:
+               return False
+
+         if alias in aliasNameSet:
+            if not exceptions:
+               raise MappingException ("Alias '%s' may not share a name with another alias on this table." % alias)
+            else:
+               return False
+
+         aliasNameSet.add (alias)
+
+      return True
+
 
    def applyMapping (self, schema):
       """
@@ -330,6 +365,9 @@ class TableMapping (object):
       """
       
       tableSchema = schema.getTable (self.name)
+
+      # Check the integrity of column and index aliases.
+      self.checkAliasIntegrity (schema)
 
       if tableSchema is None:
          raise MappingException ("The given database '%s' does not contain a table named '%s'." % (schema.getName () (self.name)))
@@ -386,8 +424,8 @@ class TableMapping (object):
 
    def getMappedColumns (self, tableSchema):
       """
-         Gets a list of all columns in the schema
-         which are in the mapping.
+         Gets a list of all columns in the mapping
+         or in the schema.
 
          If <allcolumns/> was specified, this list
          contains all of the columns from the schema.

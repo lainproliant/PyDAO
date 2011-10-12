@@ -105,7 +105,14 @@ class MySQLSchematizer (SchematizerBase):
          tableSchema.addColumn (column)
 
       for index in indexes:
-         tableSchema.addIndex (index)
+         # If the index is a primary key, set it as the
+         # primary key for the table instead of adding it
+         # to the collection of indexes.
+         if index.getName () == 'PRIMARY':
+            tableSchema.setPrimaryKey (index)
+
+         else:
+            tableSchema.addIndex (index)
 
       return tableSchema
 

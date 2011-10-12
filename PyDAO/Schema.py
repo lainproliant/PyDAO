@@ -117,6 +117,10 @@ class TableSchema (NamedObject):
    """
       An abstract representation of a table in a database.
    """
+
+   # The standard name for the primary key index in PyDAO.
+   PRIMARY_KEY = "PRIMARY"
+
    
    def __init__ (self, tableName):
       """
@@ -131,7 +135,7 @@ class TableSchema (NamedObject):
       # A list of the indexes in the table.
       self.indexes = []
 
-      # An IndexSchema for the table's primary key, if it exists.
+      # An IndexSchema for the primary key.
       self.primaryKey = None
 
       # A map of column names to columns, for fast lookups.
@@ -143,6 +147,19 @@ class TableSchema (NamedObject):
       self.indexMap = {}
 
    
+   def setPrimaryKey (self, primaryKeyIndex):
+      """
+         Sets an IndexSchema object as the primary key for this table.
+         
+         The name of the index must be the value of IndexSchema.PRIMARY_KEY.
+      """
+      
+      if primaryKeyIndex.getName () != IndexSchema.PRIMARY_KEY:
+         raise TableSchemaException ("The primary key index must be identified as '%s'." % IndexSchema.PRIMARY_KEY)
+
+      self.primaryKey = primaryKeyIndex
+
+
    def addColumn (self, column):
       """
          Adds the given column to the table.
