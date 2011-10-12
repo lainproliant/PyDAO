@@ -323,6 +323,7 @@ class TableMapping (object):
    def checkAliasIntegrity (self, schema, exceptions = True):
       """
          Checks the integrity of aliases in this table mapping.
+
          No two column or index aliases may be the same,
          and may not share a name with the real name of
          another column or index on the same table.
@@ -366,8 +367,8 @@ class TableMapping (object):
       
       tableSchema = schema.getTable (self.name)
 
-      # Check the integrity of column and index aliases.
-      self.checkAliasIntegrity (schema)
+      # Check the integrity of column and index aliases on the table.
+      self.checkAliasIntegrity (tableSchema)
 
       if tableSchema is None:
          raise MappingException ("The given database '%s' does not contain a table named '%s'." % (schema.getName () (self.name)))

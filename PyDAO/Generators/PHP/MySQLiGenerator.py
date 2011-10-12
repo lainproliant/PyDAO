@@ -94,8 +94,11 @@ class MySQLiGenerator (GeneratorBase):
          Generates a VO class file for the given table.
       """
       
-      voClassName = schema.getTable (tableName).getAlias () + 'VO'
+      tableSchema = schema.getTable (tableName)
+      voClassName = tableSchema.getAlias () + 'VO'
+      daoClassName = tableSchema.getAlias () + 'DAO'
       voClassFilePath = os.path.join (outputPath, "%s.php" % voClassName)
+      daoClassFilePath = os.path.join (outputPath, "DAO/%s.php" % daoClassName)
 
       if os.path.exists (voClassFilePath) and not overwrite:
          printOverwriteWarning (voClassFilePath)
@@ -122,7 +125,111 @@ class MySQLiGenerator (GeneratorBase):
          # Print a static get-by method for the primary key, with support
          # for composite primary keys.  If the primary key is a
          # composite key, the method will be called 'byPrimaryKey'.
-         indexSchema = 
+         primaryKey = tableSchema.getPrimaryKey ()
+         if primaryKey is not None:
+            keyColumns = [
+                  tableSchema.getColumn (c) for c in primaryKey.getColumns ()]
+
+            methodName = None
+            params = ', '.join (['$%s' % lower (c.getName ()) for c in keyColumns])
+
+            if len (keyColumns) == 1:
+               methodName = cap (keyColumns [0].getAlias ())
+            else:
+               methodName = 'PrimaryKey'
+
+            iw ('public static function by%s (%s) {' % (
+               methodName, params))
+            
+            with iw:
+               iw ('$dao = new %s ();' % daoClassName)
+               iw ('return static::fromResult ($dao->by%s (%s));' % (
+                  methodName, params))
+            
+            iw ('}')
+            iw ()
+
+         # Print a get-by method for each index.
+         for index in tableSchema.getAllIndexes ():
+            keyColumns = [
+                  tableSchema.getColumn (c) for c in index.getColumns ()]
+
+            methodName = 'by%s' % cap (index.getAlias ())
+            params = ', '.join (['$%s' % lower (c.getName ()) for c in keyColumns])
+
+            # Is the index unique?  If it is not, we must process
+            # and return multiple results in an array.
+            if index.isUnique ():
+               iw ('public static function %s (%s) {' % (
+                  methodName, params))
+
+               with iw:
+                  # The index is unique, we can return one result or NULL.
+                  iw ('$dao = new %s ();' % daoClassName)
+                  iw ('return static::fromResult ($dao->%s (%s));' % (
+                     methodName, params))
+
+               iw ('}')
+
+            else:
+               # The index is not unique, we must return an array
+               # of zero or more results.
+               methodName = 'list' + cap (methodName)
+
+               iw ('public static function %s (%s) {' % (
+                  methodName, params))
+
+               with iw:   
+                  iw ('$dao = new %s ();' % daoClassName)
+                  iw ('$objs = array ();')
+                  iw ('foreach ($dao->%s (%s) as $result) {' % (
+                     methodName, params))
+                  with iw:
+                     iw ('$objs [] = static::fromResult ($result);')
+
+                  iw ('}')
+                  iw ()
+                  iw ('return $objs;')
+
+               iw ('}')
+
+
+         # Write a static fromResult method.  This method
+         # constructs an instance of the VO object from
+         # the provided data.  It is used to unpack results
+         # from the DAO layer.
+         # If the result data is empty, NULL is returned.
+         iw ('public static function fromResult ($result) {')
+         with iw:
+            iw ('if (empty ($result)) {')
+            with iw:
+               iw ('return NULL;')
+            iw ('}')
+            iw ()
+
+            iw ('$obj = new static ();')
+            for column in tableSchema.getAllColumns ():
+               iw ('$obj->%s = $result ["%s"];' % (
+                  lower (column.getAlias ()), column.getName ()))
+
+            iw ('return $obj;')
+
+         iw ('}')
+         iw ()
+         
+         # Print a toData method.  This method is used to construct
+         # an array of data to be passed into the DAO layer.
+         iw ('protected function toData () {')
+         with iw:
+            iw ('$data = array ();')
+
+            for column in tableSchema.getAllColumns ():
+               iw ('$data ["%s"] = $this->%s' % (
+                  column.getName (), lower (column.getAlias ())))
+
+            iw ('return $data;')
+         iw ('}')
+
 
          # Write a simple get/set method pair for each variable.
          # TODO: Intelligently pack and unpack date values and
@@ -149,7 +256,7 @@ class MySQLiGenerator (GeneratorBase):
 
       outFile.close ()
      
-
+   
    def generateExceptionClass (self, outputPath, overwrite = False):
       """
          Generates a class file named DAOException.php.
