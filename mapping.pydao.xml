@@ -12,7 +12,9 @@
       </schema>
 
       <!--<generate code="XML" out="cincilms.schema.xml"/>-->
-      <generate code="PHP/MySQLi" out="build"/> 
+      <generate code="PHP/MySQLi" out="lib">
+         <param name="logger" value="getGlobalLogger ();"/>
+      </generate>
       
       <!-- By default, all tables are included if no table
            elements exist.  If any table elements exist,
@@ -32,7 +34,23 @@
          <column name="Username" as="LoginName"/>
          <column name="PasswordHash" as="PasswordHashThing"/>
          <allcolumns/>
-      </table>-->
+         <allindexes/>
+      </table>
+   </database>
+
+   <database name="Sugoicon">
+      <schema type="MySQL">
+         <params database="Sugoicon" host="localhost" port="3306"
+            user="root"/>
+         <input prompt="MySQL Password:" hidden="true" name="passwd"/>
+      </schema>
+
+      <generate code="PHP/MySQLi" out="sugoi">
+         <param name="logger" value="getGlobalLogger ();"/>
+      </generate>
+
+      <alltables/>
+
    </database>
 </mapping>
 

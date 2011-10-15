@@ -318,6 +318,18 @@ class TableMapping (object):
 
       self.allColumns = True
       self.allColumnsExplicit = True
+   
+
+   def mapAllIndexes (self):
+      """
+         Specifies that all indexes in the table schema
+         should be mapped in code generation.
+
+         Additional mappings may be specified to provide
+         index aliases.
+      """
+
+      self.allIndexes = True
 
    
    def checkAliasIntegrity (self, schema, exceptions = True):
@@ -591,7 +603,7 @@ class DatabaseMapping (object):
       # Load parameter elements.
       for element in childElements:
          if element.tagName == 'param':
-            name, value = interpretParam (element)
+            name, value = interpretParameter (element)
             params [name] = value
 
          elif element.tagName == 'params':
@@ -646,10 +658,10 @@ class DatabaseMapping (object):
       # Load parameter elements.
       for element in childElements:
          if element.tagName == 'param':
-            name, value = interpretParam (element)
+            name, value = interpretParameter (element)
             params [name] = value
 
-         if element.tagName == 'params':
+         elif element.tagName == 'params':
             newParams = interpretParams (element) 
             params.update (newParams)
             

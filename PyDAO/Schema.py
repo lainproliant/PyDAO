@@ -353,10 +353,15 @@ class ColumnSchema (NamedObject):
 
 
    def __repr__ (self):
-      s = '<column name="%s" type="%s" nullable="%s"/>\n' % (
+      s = '<column name="%s" type="%s" nullable="%s"' % (
             self.getName (),
             self.getDataType (),
             self.isNullable ())
+
+      if self.getExtra ():
+         s += ' extra="%s"' % self.getExtra ()
+
+      s += '/>\n'
    
       return s
 
@@ -380,7 +385,8 @@ class IndexSchema (NamedObject):
          Initializes an IndexSchema.
       """
 
-      self.name = indexName
+      NamedObject.__init__ (self, indexName)
+      
       self.isUniqueVal = not isUnique
       self.constraint = None
 
