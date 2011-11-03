@@ -200,7 +200,7 @@ class MySQLiGenerator (GeneratorBase):
       iw = IndentWriter (outFile)
 
       iw ('<?php')
-      iw ('include_once "%s";' % daoClassFilePath)
+      iw ('include_once "%s";' % daoRelativeClassFilePath)
       iw ()
 
       iw ('class %s {' % voClassName)
