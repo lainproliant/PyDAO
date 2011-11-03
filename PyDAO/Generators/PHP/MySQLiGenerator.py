@@ -118,6 +118,7 @@ class MySQLiGenerator (GeneratorBase):
       self.dbConnectStatement = 'databaseConnect ();'
       self.loggerStatement = 'new Logger (sprintf ("%s.log.txt", get_class ()), Logger::LEVEL_DEBUG);'
       self.printHeader = True
+      self.includeLogger = False
 
       if kwargs.has_key ('voSuffix'):
          self.voSuffix = kwargs ['voSuffix']
@@ -133,6 +134,9 @@ class MySQLiGenerator (GeneratorBase):
 
       if kwargs.has_key ('printHeader'):
          self.printHeader = parseBoolean (kwargs ['printHeader'])
+
+      if kwargs.has_key ('includeLogger'):
+         self.includeLogger = parseBoolean (kwargs ['includeLogger'])
 
 
    def generate (self, schema, outputPath, overwrite = False):
@@ -152,7 +156,7 @@ class MySQLiGenerator (GeneratorBase):
                   "Output path is not a directory: '%s'." % path)
       
       self.generateExceptionClass (daoOutputPath, overwrite)
-      self.generateLoggingClass (daoOutputPath, overwrite)
+      self.generateLoggingClass (outputPath, overwrite)
 
       tables = schema.getTableNames ()
        
@@ -435,7 +439,10 @@ class MySQLiGenerator (GeneratorBase):
 
       iw ('<?php')
       iw ('include_once "DAOException.php";')
-      iw ('include_once "Logger.php";')
+
+      if self.includeLogger:
+         iw ('include_once "../Logger.php";')
+
       iw ()
 
       iw ('class %s {' % daoClassName)
