@@ -35,7 +35,7 @@ class Logger {
 
    public function log ($message, $level = Logger::LEVEL_INFO)
    {
-      if ($level >= $this->logLevel) {
+      if ($this->logLevel >= $level) {
          $logFile = fopen ($this->logFileName, "a");
          
          if ($logFile == FALSE) {
