@@ -170,7 +170,8 @@ class MySQLiGenerator (GeneratorBase):
       voClassName = tableSchema.getAlias () + self.voSuffix
       daoClassName = tableSchema.getAlias () + self.daoSuffix
       voClassFilePath = os.path.join (outputPath, '%s.php' % voClassName)
-      daoClassFilePath = os.path.join (outputPath, 'DAO/%s.php' % daoClassName)
+      daoRelativeClassFilePath = 'DAO/%s.php' % daoClassName
+      daoClassFilePath = os.path.join (outputPath, daoRelativeClassFilePath)
       
       if os.path.exists (voClassFilePath) and not overwrite:
          printOverwriteWarning (voClassFilePath)
